@@ -1,12 +1,8 @@
-
-
-<img align="center" src="macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png" alt="app_icon_256" style="zoom: 50%;" />
-
+<p align="center">
+<img src="macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png" alt="app_icon_256" style="zoom: 50%;"/>
+</p>
 <h1 align="center">bujuan</h1>
-
 <p align="center">一个支持Android、iOS、MacOS、Windows、Linux的三方网易云播放器。</p>
-
-
 
 #### MacOS (适配中)	
 
