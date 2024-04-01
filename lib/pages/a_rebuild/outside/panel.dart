@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:animated_background/animated_background.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:bujuan/common/constants/other.dart';
@@ -12,6 +14,8 @@ import '../../../common/lyric_parser/parser_lrc.dart';
 import '../../../common/netease_api/src/api/event/bean.dart';
 import '../../../common/netease_api/src/api/play/bean.dart';
 import '../../../common/netease_api/src/netease_api.dart';
+
+import '../../../widget/slider/slider.dart';
 
 class SongData {
   MediaItem mediaItem;
@@ -30,6 +34,12 @@ class PanelWidgetSize {
 final mediaItemProvider = StreamProvider((ref) => ref.watch(audioHandler).mediaItem.stream);
 
 final playStateProvider = StreamProvider((ref) => ref.watch(audioHandler).playbackState.stream);
+
+final playTimeProvider = StreamProvider((ref) => AudioService.createPositionStream(minPeriod: Duration(microseconds: 800), steps: 1000));
+
+final duration = StateProvider<int>((ref) {
+  return (ref.watch(playTimeProvider).value ?? const Duration(microseconds: 0)).inMilliseconds;
+});
 
 final songDataProvider = StateProvider<SongData>((ref) {
   MediaItem? mediaItem = ref.watch(mediaItemProvider).value;
@@ -52,6 +62,8 @@ final lyricProvider = FutureProvider((ref) async {
 });
 
 final isOpen = StateProvider((ref) => ref.read(panelController).isPanelOpen);
+
+final pageController = Provider((ref) => PageController());
 
 final hotTalkProvider = FutureProvider((ref) async {
   CommentItem commentItem = CommentItem();
@@ -111,8 +123,9 @@ class PlayBar extends ConsumerWidget {
     animationController.value = ref.watch(slideProvider.notifier).state;
     PaletteGenerator paletteGenerator = ref.watch(paletteProvider.notifier).state ?? PaletteGenerator.fromColors([]);
     SongData songData = ref.watch(songDataProvider.notifier).state;
+
     return GestureDetector(
-      child: buildContent(context, paletteGenerator, songData),
+      child: buildContent(context, paletteGenerator, songData, ref),
       onHorizontalDragEnd: (e) {},
       onTap: () {
         if (!ref.read(panelController).isPanelOpen) {
@@ -122,319 +135,308 @@ class PlayBar extends ConsumerWidget {
     );
   }
 
-  Widget buildContent(BuildContext context, PaletteGenerator p, SongData songData) {
+  Widget buildContent(BuildContext context, PaletteGenerator p, SongData songData, WidgetRef ref) {
     return AnimatedBuilder(
       animation: animationController,
-      builder: (BuildContext context, Widget? child) => Container(
-        decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15.w),
-            gradient: LinearGradient(colors: [
-              p.darkMutedColor?.color ?? p.darkVibrantColor?.color ?? Theme.of(context).scaffoldBackgroundColor,
-              p.dominantColor?.color ?? p.darkMutedColor?.color ?? Theme.of(context).scaffoldBackgroundColor,
-            ], begin: Alignment.topRight, end: Alignment.bottomLeft)),
-        height: PanelWidgetSize.playBarHeight + (MediaQuery.of(context).size.height - PanelWidgetSize.playBarHeight) * animationController.value,
-        margin: EdgeInsets.symmetric(horizontal: 15.w * (1 - animationController.value)),
-        child: child,
+      builder: (BuildContext context, Widget? child) {
+        // 定义一个原始颜色
+        Color originalColor = p.dominantColor?.color ?? p.lightMutedColor?.color ?? p.darkMutedColor?.color ?? Colors.white;
+        return Container(
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(15.w), color: Colors.white),
+          margin: EdgeInsets.symmetric(horizontal: 15.w * (1 - animationController.value)),
+          height: PanelWidgetSize.playBarHeight + (MediaQuery.of(context).size.height - PanelWidgetSize.playBarHeight) * animationController.value,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(15.w),
+              gradient: LinearGradient(colors: [
+                Colors.white,
+                Theme.of(context).scaffoldBackgroundColor,
+                originalColor.withOpacity(animationController.value),
+              ], begin: Alignment.bottomCenter, end: Alignment.topLeft),
+            ),
+            height: PanelWidgetSize.playBarHeight + (MediaQuery.of(context).size.height - PanelWidgetSize.playBarHeight) * animationController.value,
+            // margin: EdgeInsets.symmetric(horizontal: 15.w * (1 - animationController.value)),
+            child: child,
+          ),
+        );
+      },
+      child: PageView(
+        physics: const NeverScrollableScrollPhysics(),
+        controller: ref.watch(pageController),
+        children: [
+          _buildWidget(context, p, songData),
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Column(
+              children: [],
+            ),
+            floatingActionButton: IconButton(
+                onPressed: () {
+                  ref.read(pageController).animateToPage(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                },
+                icon: const Icon(Icons.clear)),
+          )
+        ],
       ),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 30.w),
-        height: MediaQuery.of(context).size.height,
-        child: AnimatedBackground(
-          vsync: tickerProvider,
-          behaviour: RandomParticleBehaviour(
-              options: ParticleOptions(
-                  baseColor: p.lightMutedColor?.color ?? p.darkMutedColor?.color ?? Colors.grey,
-                  spawnMaxSpeed: 100,
-                  spawnMinSpeed: 50,
-                  spawnOpacity: .2,
-                  particleCount: songData.panelOpen ? 16 : 0,
-                  spawnMaxRadius: 10.w)),
-          child: _buildWidget(context, p, songData),
-        ),
-      ),
+      // child: AnimatedBackground(
+      //   vsync: tickerProvider,
+      //   behaviour: RandomParticleBehaviour(
+      //       options: ParticleOptions(
+      //           baseColor: Theme.of(context).scaffoldBackgroundColor.withOpacity(animationController.value),
+      //           spawnMaxSpeed: 100,
+      //           spawnMinSpeed: 50,
+      //           spawnOpacity: .2,
+      //           particleCount: (animationController.value * 16).toInt(),
+      //           spawnMaxRadius: 10.w)),
+      //   child: PageView(
+      //     physics: const NeverScrollableScrollPhysics(),
+      //     children: [
+      //       _buildWidget(context, p, songData),
+      //       const Center(
+      //         child: Text('lyric'),
+      //       )
+      //     ],
+      //   ),
+      // ),
     );
   }
 
   Widget _buildWidget(BuildContext context, PaletteGenerator p, SongData songData) {
-    return Column(
-      children: [
-        AnimatedBuilder(
-            animation: animationController,
-            builder: (BuildContext context, Widget? child) => AnimatedOpacity(
-                  opacity: animationController.value,
-                  duration: Duration.zero,
-                  child: SizedBox(
-                    height: 20.w + (MediaQuery.of(context).size.height * .45 - 20.w) * animationController.value,
-                    child: child,
-                  ),
-                ),
-            child: Container(
-              alignment: Alignment.topCenter,
-              height: MediaQuery.of(context).size.height * .45,
-              child: _buildTopWidget(p, songData),
-            )),
-        AnimatedBuilder(
-          animation: animationController,
-          builder: (BuildContext context, Widget? child) => SizedBox(
-            width: MediaQuery.of(context).size.width,
-            height: 100.w + (MediaQuery.of(context).size.height * .55 - 100.w) * animationController.value,
-            child: child,
-          ),
-          child: Stack(
-            alignment: Alignment.topLeft,
-            children: [
-              AnimatedBuilder(
-                animation: animationController,
-                builder: (BuildContext context, Widget? child) => AnimatedPositioned(
-                    duration: const Duration(milliseconds: 0),
-                    left: 10.w * animationController.value,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 40),
-                      width: PanelWidgetSize.imageMinSize + ((PanelWidgetSize.imageMaxSize - PanelWidgetSize.imageMinSize) * animationController.value),
-                      height: PanelWidgetSize.imageMinSize + ((PanelWidgetSize.imageMaxSize - PanelWidgetSize.imageMinSize) * animationController.value),
+    Color originalColor = p.dominantColor?.color ?? p.lightMutedColor?.color ?? p.darkMutedColor?.color ?? Colors.white;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20.w),
+      child: Column(
+        children: [
+          AnimatedBuilder(
+              animation: animationController,
+              builder: (BuildContext context, Widget? child) => AnimatedOpacity(
+                    opacity: animationController.value,
+                    duration: Duration.zero,
+                    child: SizedBox(
+                      height: 20.w + (MediaQuery.of(context).size.height * .45 - 20.w) * animationController.value,
                       child: child,
-                    )),
-                child: SimpleExtendedImage(
-                  '${songData.mediaItem.extras!['image'] ?? ''}?param=480y480',
-                  width: PanelWidgetSize.imageMaxSize,
-                  height: PanelWidgetSize.imageMaxSize,
-                  borderRadius: BorderRadius.circular(8.w),
-                ),
-              ),
-              Positioned(
-                height: 80.w,
-                left: 10.w + 90.w * (1 - animationController.value),
-                top: 400.w * animationController.value,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: SizedBox(
-                    width: MediaQuery.of(context).size.width - 80.w,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                            child: Text(
-                          songData.mediaItem.title,
-                          style: TextStyle(
-                            color: p.darkMutedColor?.bodyTextColor,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 28.sp + animationController.value * 8,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        )),
-                        AnimatedOpacity(
-                          opacity: animationController.value,
-                          duration: Duration.zero,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.more_vert,
-                                size: 42.w,
-                                color: p.darkMutedColor?.bodyTextColor,
-                              ),
-                            ],
-                          ),
-                        )
-                      ],
                     ),
                   ),
-                ),
-              ),
-              Padding(
-                padding: EdgeInsets.only(left: 10.w),
-                child: AnimatedBuilder(
+              child: Container(
+                alignment: Alignment.topCenter,
+                height: MediaQuery.of(context).size.height * .45,
+                child: _buildTopWidget(p, songData),
+              )),
+          AnimatedBuilder(
+            animation: animationController,
+            builder: (BuildContext context, Widget? child) => SizedBox(
+              width: MediaQuery.of(context).size.width,
+              height: 100.w + (MediaQuery.of(context).size.height * .55 - 100.w) * animationController.value,
+              child: child,
+            ),
+            child: Stack(
+              alignment: Alignment.topLeft,
+              children: [
+                AnimatedBuilder(
                   animation: animationController,
-                  builder: (BuildContext context, Widget? child) => AnimatedContainer(
-                    duration: const Duration(milliseconds: 30),
-                    alignment: Alignment.center,
-                    height: 80.w + (380.w - 80.w) * animationController.value,
-                    width: 80.w + (380.w - 80.w) * animationController.value,
-                    margin: EdgeInsets.only(
-                      left: (MediaQuery.of(context).size.width - 180.w) * (1 - animationController.value),
-                    ),
-                    child: Consumer(
-                      builder: (BuildContext context, WidgetRef ref, Widget? child) => GestureDetector(
-                        child: Container(
-                          decoration: BoxDecoration(color: p.dominantColor?.color.withOpacity(animationController.value * .8), borderRadius: BorderRadius.circular(40.w)),
-                          child: Icon(
-                            songData.playState?.playing ?? false ? Icons.pause : Icons.play_arrow,
-                            color: p.darkMutedColor?.bodyTextColor,
-                            size: 48.w + animationController.value * 30.w,
-                          ),
-                        ),
-                        onTap: () {
-                          if (songData.playState?.playing ?? false) {
-                            ref.read(audioHandler).pause();
-                          } else {
-                            ref.read(audioHandler).play();
-                          }
-                        },
+                  builder: (BuildContext context, Widget? child) => AnimatedPositioned(
+                      duration: const Duration(milliseconds: 0),
+                      left: 10.w * animationController.value,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 40),
+                        width: PanelWidgetSize.imageMinSize + ((PanelWidgetSize.imageMaxSize - PanelWidgetSize.imageMinSize) * animationController.value),
+                        height: PanelWidgetSize.imageMinSize + ((PanelWidgetSize.imageMaxSize - PanelWidgetSize.imageMinSize) * animationController.value),
+                        child: child,
+                      )),
+                  child: SimpleExtendedImage(
+                    '${songData.mediaItem.extras!['image'] ?? ''}?param=480y480',
+                    width: PanelWidgetSize.imageMaxSize,
+                    height: PanelWidgetSize.imageMaxSize,
+                    borderRadius: BorderRadius.circular(8.w),
+                  ),
+                ),
+                Positioned(
+                  height: 80.w,
+                  left: 10.w + 90.w * (1 - animationController.value),
+                  top: 400.w * animationController.value,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: MediaQuery.of(context).size.width - 80.w,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                              child: Text(
+                            songData.mediaItem.title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 28.sp + animationController.value * 8,
+                              color: const Color(0xFF464545),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )),
+                          AnimatedOpacity(
+                            opacity: animationController.value,
+                            duration: Duration.zero,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.more_vert,
+                                  size: 42.w,
+                                  color: const Color(0xFF464545),
+                                ),
+                              ],
+                            ),
+                          )
+                        ],
                       ),
                     ),
                   ),
                 ),
-              ),
-              AnimatedBuilder(
-                  animation: animationController,
-                  builder: (BuildContext context, Widget? child) => AnimatedPositioned(
-                      duration: const Duration(milliseconds: 80),
-                      top: 480.w,
-                      left: 10.w,
-                      child: AnimatedOpacity(
-                        opacity: animationController.value,
-                        duration: const Duration(milliseconds: 200),
-                        child: SizedBox(
-                          width: MediaQuery.of(context).size.width - 80.w,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                songData.mediaItem.artist ?? 'Post malne',
-                                style: TextStyle(fontSize: 28.sp, fontWeight: FontWeight.w500, color: p.darkMutedColor?.bodyTextColor),
-                              ),
-                              Container(
-                                margin: EdgeInsets.only(top: 30.w),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Consumer(
-                                          builder: (BuildContext context, WidgetRef ref, Widget? child) => GestureDetector(
-                                            child: Icon(
-                                              Icons.skip_previous,
-                                              color: p.darkMutedColor?.bodyTextColor,
-                                              size: 66.w,
-                                            ),
-                                            onTap: () {
-                                              ref.read(audioHandler).skipToPrevious();
-                                              // ref.read(panelController).close();
-                                            },
-                                          ),
-                                        ),
-                                        Padding(padding: EdgeInsets.symmetric(horizontal: 50.w)),
-                                        Consumer(
-                                          builder: (BuildContext context, WidgetRef ref, Widget? child) => GestureDetector(
-                                            child: Icon(
-                                              Icons.skip_next,
-                                              color: p.darkMutedColor?.bodyTextColor,
-                                              size: 66.w,
-                                            ),
-                                            onTap: () {
-                                              ref.read(audioHandler).skipToNext();
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    GestureDetector(
-                                      child: Icon(
-                                        Icons.favorite,
-                                        size: 42.w,
-                                        color: p.darkMutedColor?.bodyTextColor,
-                                      ),
-                                      onTap: () {
-                                        print('喜欢歌曲');
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                Padding(
+                  padding: EdgeInsets.only(left: 10.w),
+                  child: AnimatedBuilder(
+                    animation: animationController,
+                    builder: (BuildContext context, Widget? child) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 30),
+                      alignment: Alignment.center,
+                      height: 80.w + (380.w - 80.w) * animationController.value,
+                      width: 80.w + (380.w - 80.w) * animationController.value,
+                      margin: EdgeInsets.only(
+                        left: (MediaQuery.of(context).size.width - 180.w) * (1 - animationController.value),
+                      ),
+                      child: Consumer(
+                        builder: (BuildContext context, WidgetRef ref, Widget? child) => GestureDetector(
+                          child: Container(
+                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(40.w)),
+                            child: Icon(
+                              songData.playState?.playing ?? false ? Icons.pause : Icons.play_arrow,
+                              size: 48.w + animationController.value * 30.w,
+                              color: const Color(0xFF464545),
+                            ),
                           ),
+                          onTap: () {
+                            if (songData.playState?.playing ?? false) {
+                              ref.read(audioHandler).pause();
+                            } else {
+                              ref.read(audioHandler).play();
+                            }
+                          },
                         ),
-                      ))),
-            ],
+                      ),
+                    ),
+                  ),
+                ),
+                AnimatedBuilder(
+                    animation: animationController,
+                    builder: (BuildContext context, Widget? child) => AnimatedPositioned(
+                        duration: const Duration(milliseconds: 80),
+                        top: 480.w,
+                        left: 10.w,
+                        child: AnimatedOpacity(
+                          opacity: animationController.value,
+                          duration: const Duration(milliseconds: 200),
+                          child: SizedBox(
+                            width: MediaQuery.of(context).size.width - 80.w,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  songData.mediaItem.artist ?? 'Post malne',
+                                  style: TextStyle(fontSize: 28.sp, fontWeight: FontWeight.w500, color: Colors.grey),
+                                ),
+                                Padding(padding: EdgeInsets.symmetric(vertical: 25.w)),
+                                Consumer(builder: (BuildContext context, WidgetRef ref, Widget? child) {
+                                  int durationValue = ref.watch(duration);
+                                  return SquigglySlider(
+                                    thumbColor: originalColor.withOpacity(.6),
+                                    activeColor: Colors.grey,
+                                    inactiveColor: Colors.grey.withOpacity(.6),
+                                    squiggleAmplitude: 5.0,
+                                    squiggleWavelength: 6.0,
+                                    max: 1,
+                                    squiggleSpeed: 0,
+                                    value: durationValue / (songData.mediaItem.duration ?? const Duration(milliseconds: 300)).inMilliseconds,
+                                    onChanged: (double value) {
+                                      int changeValue = (value * (songData.mediaItem.duration ?? const Duration(milliseconds: 300)).inMilliseconds).toInt();
+                                      ref.refresh(duration.notifier).state = changeValue;
+                                      ref.read(audioHandler).seek(Duration(milliseconds: changeValue));
+                                    },
+                                  );
+                                }),
+                                Container(
+                                  margin: EdgeInsets.only(top: 50.w, left: 10.w, right: 10.w),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Consumer(
+                                            builder: (BuildContext context, WidgetRef ref, Widget? child) => GestureDetector(
+                                              child: Icon(
+                                                Icons.skip_previous,
+                                                size: 66.w,
+                                                color: const Color(0xFF464545),
+                                              ),
+                                              onTap: () {
+                                                ref.read(audioHandler).skipToPrevious();
+
+                                                // ref.read(panelController).close();
+                                              },
+                                            ),
+                                          ),
+                                          Padding(padding: EdgeInsets.symmetric(horizontal: 50.w)),
+                                          Consumer(
+                                            builder: (BuildContext context, WidgetRef ref, Widget? child) => GestureDetector(
+                                              child: Icon(
+                                                Icons.skip_next,
+                                                size: 66.w,
+                                                color: const Color(0xFF464545),
+                                              ),
+                                              onTap: () {
+                                                ref.read(audioHandler).skipToNext();
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      GestureDetector(
+                                        child: Icon(
+                                          Icons.favorite,
+                                          size: 42.w,
+                                          color: const Color(0xFF464545),
+                                        ),
+                                        onTap: () {
+                                          print('喜欢歌曲');
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ))),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildTopWidget(PaletteGenerator p, SongData songData) {
-    return const SafeArea(
+    return SafeArea(
         bottom: false,
-        child: Stack(
-          children: [
-            // Padding(
-            //   padding: EdgeInsets.only(left: 10.w, right: 10.w, top: 20.w),
-            //   child: Row(
-            //     children: [
-            //       SimpleExtendedImage(
-            //         '',
-            //         width: 80.w,
-            //         height: 80.w,
-            //         borderRadius: BorderRadius.circular(50.w),
-            //       ),
-            //       Padding(padding: EdgeInsets.symmetric(horizontal: 10.w)),
-            //       Expanded(
-            //           child: Text(
-            //         songData.mediaItem.artist ?? '',
-            //         style: TextStyle(fontSize: 32.sp, fontWeight: FontWeight.w500, color: p.darkMutedColor?.bodyTextColor),
-            //       )),
-            //       Consumer(
-            //         builder: (BuildContext context, WidgetRef ref, Widget? child) {
-            //           return GestureDetector(
-            //               onTap: () {
-            //                 print('关注歌手');
-            //               },
-            //               child: Icon(Icons.add_circle, color: p.darkMutedColor?.bodyTextColor));
-            //         },
-            //       )
-            //     ],
-            //   ),
-            // ),
-
-            // Padding(padding: EdgeInsets.only(top: 120.w,bottom: 30.w),child: Consumer(
-            //   builder: (BuildContext context, WidgetRef ref, Widget? child) => ref.watch(lyricProvider).when(
-            //       data: (List<LyricsLineModel> data) => Container(
-            //         width: MediaQuery.of(context).size.width,
-            //         decoration: BoxDecoration(
-            //           color: p.dominantColor?.color.withOpacity(.6),
-            //           borderRadius: BorderRadius.circular(20.w)
-            //         ),
-            //         padding: EdgeInsets.symmetric(horizontal: 15.w,vertical: 15.w),
-            //         child: ClickableListWheelScrollView(
-            //           itemHeight:120.w,
-            //           itemCount: data.length,
-            //           onItemTapCallback: (index) {
-            //             //点击歌词
-            //           },
-            //           scrollController: ScrollController(),
-            //           child: ListWheelScrollView.useDelegate(
-            //             itemExtent:  120.w,
-            //             perspective: 0.0006,
-            //             onSelectedItemChanged: (index) {
-            //               //TODO 此处可以获取实时歌词
-            //             },
-            //             childDelegate: ListWheelChildBuilderDelegate(
-            //               builder: (context, index) => Container(
-            //                 width: MediaQuery.of(context).size.width,
-            //                 height:  120.w,
-            //                 alignment: Alignment.center,
-            //                 child: Column(
-            //                   crossAxisAlignment: CrossAxisAlignment.center,
-            //                   children: [
-            //                     Text(
-            //                       data[index].mainText ?? '',
-            //                       style: TextStyle(fontSize: 36.sp, color: p.dominantColor?.bodyTextColor),
-            //                       textAlign: TextAlign.center,
-            //                       maxLines: 2,
-            //                       overflow: TextOverflow.ellipsis,
-            //                     ),
-            //                   ],
-            //                 ),
-            //               ),
-            //               childCount: data.length,
-            //             ),
-            //           ),
-            //         ),
-            //       ),
-            //       error: (Object error, StackTrace stackTrace) => Container(),
-            //       loading: () => Container()),
-            // ),)
-          ],
+        child: Container(
+          child: AnimatedBackground(
+            vsync: tickerProvider,
+            behaviour: RandomParticleBehaviour(
+                options: ParticleOptions(
+                    baseColor: (p.dominantColor?.bodyTextColor ?? Colors.grey).withOpacity(.3),
+                    spawnMaxSpeed: 100,
+                    spawnMinSpeed: 50,
+                    spawnOpacity: .01,
+                    particleCount: (animationController.value * 10).toInt(),
+                    spawnMaxRadius: 10.w)), child: const SizedBox.shrink(),
+          ),
         ));
   }
 }

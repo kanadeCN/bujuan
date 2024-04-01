@@ -8,21 +8,12 @@ import 'package:bujuan/pages/a_rebuild/home/home.dart';
 import 'package:bujuan/pages/a_rebuild/outside/outside.dart';
 import 'package:bujuan/pages/a_rebuild/playlist/playlist.dart';
 import 'package:bujuan/pages/a_rebuild/user/user.dart';
-import 'package:bujuan/pages/album/controller.dart';
-import 'package:bujuan/pages/index/cound_controller.dart';
-import 'package:bujuan/pages/index/index_controller.dart';
 import 'package:bujuan/pages/login/login.dart';
-import 'package:bujuan/pages/play_list/playlist_controller.dart';
-import 'package:bujuan/pages/playlist_manager/playlist_manager_controller.dart';
-import 'package:bujuan/pages/user/user_controller.dart';
-import 'package:bujuan/routes/router.gr.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_zoom_drawer/flutter_zoom_drawer.dart';
-import 'package:get/get.dart';
 import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -30,7 +21,6 @@ import 'package:just_audio/just_audio.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'common/constants/colors.dart';
-import 'common/netease_api/src/netease_api.dart';
 
 main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,14 +28,16 @@ main() async {
   final getIt = GetIt.instance;
   await _initAudioServer(getIt);
   if (PlatformUtils.isAndroid) {
-    await FlutterDisplayMode.setHighRefreshRate();
-    SystemUiOverlayStyle systemUiOverlayStyle = const SystemUiOverlayStyle(
+    // await FlutterDisplayMode.setHighRefreshRate();
+    // SystemChrome.setEnabledSystemUIMode(
+    //   SystemUiMode.edgeToEdge,
+    // );
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark.copyWith(
+      // 沉浸式状态栏（仅安卓）
       statusBarColor: Colors.transparent,
+      // 沉浸式导航指示器
       systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarContrastEnforced: false,
-    );
-    SystemChrome.setSystemUIOverlayStyle(systemUiOverlayStyle);
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge, overlays: [SystemUiOverlay.top]);
+    ));
   }
   //如果满足横屏条件，强制屏幕为横屏
   if (land) {
@@ -58,26 +50,26 @@ main() async {
     navigatorKey: rootNavigatorKey,
     routes: [
       ShellRoute(navigatorKey: shellNavigatorKey, builder: (BuildContext context, GoRouterState state, Widget child) => Outside(child: child), routes: [
-        GoRoute(path: '/', builder: (c, s) => const HomePage(),routes: [
+        GoRoute(path: '/', builder: (c, s) => const HomePage(), routes: [
           GoRoute(path: 'playlist', builder: (c, s) => PlayList(s.extra! as Play)),
         ]),
         GoRoute(path: '/user', builder: (c, s) => const User()),
         GoRoute(path: '/login', builder: (c, s) => const LoginViewPage()),
-
       ])
     ],
   );
-  runApp(ProviderScope(
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge).then((value) => runApp(ProviderScope(
       child: ScreenUtilInit(
-    designSize: const Size(750, 1334),
-    minTextAdapt: true,
-    splitScreenMode: true,
-    builder: (context, child) => MaterialApp.router(
-      theme: AppTheme.dark,
-      routerConfig: router,
-      // showPerformanceOverlay: true,
-    ),
-  )));
+          designSize: const Size(750, 1334),
+          minTextAdapt: true,
+          splitScreenMode: true,
+          builder: (context, child) {
+            return MaterialApp.router(
+              // showPerformanceOverlay: true,
+              theme: AppTheme.light,
+              routerConfig: router,
+            );
+          }))));
   // SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge).then((value) => runApp(ScreenUtilInit(
   //       designSize: !land ? const Size(750, 1334) : const Size(2339, 1080),
   //       minTextAdapt: true,
@@ -161,9 +153,9 @@ main() async {
 // }
 
 Future<void> _initAudioServer(getIt) async {
-  getIt.registerSingleton<RootRouter>(RootRouter());
+  // getIt.registerSingleton<RootRouter>(RootRouter());
   getIt.registerSingleton<AudioPlayer>(AudioPlayer());
-  getIt.registerSingleton<ZoomDrawerController>(ZoomDrawerController());
+  // getIt.registerSingleton<ZoomDrawerController>(ZoomDrawerController());
   await Hive.initFlutter('BuJuan');
   getIt.registerSingleton<Box>(await Hive.openBox('cache'));
   await NeteaseMusicApi.init(debug: false);

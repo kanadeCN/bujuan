@@ -90,8 +90,8 @@ class ThebrioflashynavbarItem {
   ThebrioflashynavbarItem({
     required this.icon,
     required this.title,
-    this.activeColor = const Color(0xffffffff),
-    this.inactiveColor = const Color(0xffb8b5b5),
+    this.activeColor = const Color(0xff1c1c1c),
+    this.inactiveColor = const Color(0xffa09e9e),
   });
 }
 

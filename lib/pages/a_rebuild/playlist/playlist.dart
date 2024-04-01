@@ -24,28 +24,28 @@ class PlayList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(),
-      body: ref.watch(playList(play.id)).when(
-        data: (data) {
-          return ListView.builder(
-            padding: EdgeInsets.only(left: 30.w,right: 30.w,bottom: 100.w),
-            itemBuilder: (context, index) => GestureDetector(
-              child: Padding(padding: EdgeInsets.symmetric(vertical: 20.w),child: Row(
-                children: [
-                  SimpleExtendedImage('${data[index].extras!['image']??''}?param=200y200',cacheWidth: 200,width: 90.w,height: 90.w,),
-                  Padding(padding: EdgeInsets.symmetric(horizontal: 10.w)),
-                  Expanded(child: Text(data[index].title??''),)
-                ],
-              ),),
-              onTap: (){
-                ref.read(audioHandler).changeQueueLists(data,index: index);
-              },
-            ),
-            itemCount: data.length,
-          );
-        },
-        error: (Object error, StackTrace stackTrace) {},
-        loading: () => Container(),
-      ),
+      // body: ref.watch(playList(play.id)).when(
+      //   data: (data) {
+      //     return ListView.builder(
+      //       padding: EdgeInsets.only(left: 30.w,right: 30.w,bottom: 100.w),
+      //       itemBuilder: (context, index) => GestureDetector(
+      //         child: Padding(padding: EdgeInsets.symmetric(vertical: 20.w),child: Row(
+      //           children: [
+      //             SimpleExtendedImage('${data[index].extras!['image']??''}?param=200y200',cacheWidth: 200,width: 90.w,height: 90.w,),
+      //             Padding(padding: EdgeInsets.symmetric(horizontal: 10.w)),
+      //             Expanded(child: Text(data[index].title??''),)
+      //           ],
+      //         ),),
+      //         onTap: (){
+      //           ref.read(audioHandler).changeQueueLists(data,index: index);
+      //         },
+      //       ),
+      //       itemCount: data.length,
+      //     );
+      //   },
+      //   error: (Object error, StackTrace stackTrace) {},
+      //   loading: () => Container(),
+      // ),
     );
   }
 }

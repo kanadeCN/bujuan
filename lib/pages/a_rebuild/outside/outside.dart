@@ -2,6 +2,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:bujuan/pages/a_rebuild/outside/panel.dart';
 import 'package:bujuan/widget/weslide/panel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_zoom_drawer/flutter_zoom_drawer.dart';
@@ -26,20 +27,24 @@ class Outside extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    print('object===============outslider');
     return Scaffold(
-      backgroundColor: const Color(0xff121212),
       body: SlidingUpPanel(
         body: child,
         boxShadow: const [],
         color: Colors.transparent,
         parallaxEnabled: true,
-        parallaxOffset: .03,
+        parallaxOffset: .01,
         maxHeight: MediaQuery.of(context).size.height,
         minHeight: 120.w + 70 + MediaQuery.of(context).padding.bottom,
-        onPanelSlide: (double position) => ref.refresh(slideProvider.notifier).state = position,
+        onPanelSlide: (double position) {
+          ref.refresh(slideProvider.notifier).state = position;
+        },
+
         onPanelOpened: () => ref.refresh(isOpen.notifier).state = true,
-        onPanelClosed: () => ref.refresh(isOpen.notifier).state = false,
+        onPanelClosed: () {
+          ref.refresh(isOpen.notifier).state = false;
+          ref.read(pageController).animateTo(0, duration: const Duration(milliseconds: 10), curve: Curves.easeInOut);
+        },
         panelBuilder: () => const Panel(),
         controller: ref.read(panelController),
         disableDraggableOnScrolling: false,
@@ -63,27 +68,27 @@ class Footer extends ConsumerWidget {
         height: 70,
         selectedIndex: selectIndex,
         iconSize: 24,
-        showElevation: true,
+        showElevation: false,
         onItemSelected: (index) {
           ref.refresh(indexProvider.notifier).state = index;
           context.go(ref.read(routers)[index]);
         },
         items: [
           ThebrioflashynavbarItem(
-            icon: Icon(Icons.event),
-            title: Text('主页'),
+            icon: const Icon(Icons.home),
+            title: const Text('Home'),
           ),
           ThebrioflashynavbarItem(
-            icon: Icon(Icons.search),
-            title: Text('搜索'),
+            icon: const Icon(Icons.search),
+            title: const Text('Search'),
           ),
           ThebrioflashynavbarItem(
-            icon: Icon(Icons.highlight),
-            title: Text('排行'),
+            icon: const Icon(Icons.face),
+            title: const Text('Top'),
           ),
           ThebrioflashynavbarItem(
-            icon: Icon(Icons.settings),
-            title: Text('设置'),
+            icon: const Icon(Icons.settings),
+            title: const Text('Setting'),
           ),
         ],
       ),
